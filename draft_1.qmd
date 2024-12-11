@@ -1,0 +1,465 @@
+---
+title: "Untitled"
+format: 
+  pdf:
+    pdf-engine: pdflatex
+    keep-tex: true
+    documentclass: article
+    fontsize: 10pt  
+    header-includes:
+      - \usepackage{geometry}
+      - \geometry{top=1in, bottom=1in, left=1in, right=1in}
+      - \usepackage{listings}
+      - \lstset{
+          breaklines=true,
+          breakatwhitespace=true,
+          basicstyle=\ttfamily\small,
+          frame=single,
+          tabsize=2,
+          xleftmargin=0.5cm,
+          xrightmargin=0.5cm}
+      - \usepackage{setspace}
+      - \setstretch{1.15}
+      - \usepackage{parskip}
+      - \setlength{\parskip}{0.5em}
+      - \setlength{\parindent}{0em}
+      - \setlength{\emergencystretch}{3em}
+      - \usepackage{placeins}
+  html:
+    prefer-html: true  
+editor: visual
+---
+
+```{r, echo=FALSE}
+
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+
+# install.packages(c(
+#   "tidyverse", "data.table", "janitor", "lubridate",
+#   "readxl", "openxlsx", "DBI", "RSQLite", "httr", "jsonlite",
+#   "ggplot2", "plotly", "ggridges", "ggpubr", "corrplot",
+#   "lmtest", "sandwich", "MASS", "lme4", "forecast",
+#   "AER", "rstan", "brms", "coda", "BayesFactor",
+#   "sf", "rgdal", "rgeos", "tmap",
+#   "arrow", "sparklyr", "parallel", "furrr",
+#   "wbstats", "imfr", "OECD", "tidycensus", "trade",
+#   "knitr", "rmarkdown", "kableExtra", "officer",
+#   "xgboost", "glmnet", "tidymodels",
+#   "testthat", "assertthat"
+# ))
+install.packages("ggthemes")
+
+```
+
+```{r, echo=FALSE}
+
+load_libraries <- function(packages) {
+  for (pkg in packages) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE)
+  }
+}
+
+packages <- c(
+  # Data manipulation and cleaning
+  "tidyverse", "data.table", "janitor", "lubridate",
+  
+  # Data import
+  "readxl", "openxlsx", "DBI", "RSQLite", "httr", "jsonlite",
+  
+  # Data visualization
+  "ggplot2", "plotly", "ggridges", "ggpubr", "corrplot",
+  
+  # Statistical modeling and analysis
+  "lmtest", "sandwich", "caret", "MASS", "lme4", "forecast", "AER",
+  
+  # Bayesian analysis
+  "rstan", "brms", "coda", "BayesFactor",
+  
+  
+  # Trade and economics-specific
+  "wbstats", "OECD", "tidycensus", "trade",
+  
+  # Report generation
+  "knitr", "rmarkdown", "kableExtra", "officer",
+  
+  # Advanced techniques
+  "xgboost", "glmnet", "tidymodels"
+)
+
+# Execute the function to load libraries
+load_libraries(packages)
+
+# Confirm loaded packages
+print("All required libraries are loaded!")
+
+```
+
+```{r, echo=FALSE}
+# install.packages("foreign")
+library(foreign)
+# install.packages("DataExplorer")
+library(DataExplorer)
+# install.packages("SmartEDA")
+library(SmartEDA)
+# install.packages("dataMaid")
+library(dataMaid)
+# install.packages("RSQLite")
+library(RSQLite)
+```
+
+```{r, echo=FALSE}
+Trade <- read_csv("C:/Users/vasud/OneDrive/Desktop/U-M - ALL/STATS 506/Final Project Data/KAGGLE/growth-of-income-and-trade/growth-of-income-and-trade.csv")
+
+CW_Data <- read.csv("C:/Users/vasud/OneDrive/Desktop/U-M - ALL/STATS 506/Final Project Data/KAGGLE/archive/Countrywise_Trade_Analysis_1988-2021.csv")
+
+```
+
+```{r}
+colnames(Trade)
+print(summary(Trade))
+
+```
+
+```{r}
+colnames(CW_Data)
+print(summary(CW_Data))
+
+```
+
+```{r}
+AnnVal <- read.csv("C:/Users/vasud/OneDrive/Desktop/U-M - ALL/STATS 506/Final Project Data/KAGGLE/archive/AnnualValue.csv")
+```
+
+```{r}
+merged_data_full <- left_join(Trade, CW_Data, by = c("CountryName" = "CountryName", "Year" = "Year"))
+merged_data_full2 <- left_join(merged_data_full, AnnVal, by = c("CountryName" = "CountryName", "Year" = "Year"))
+
+
+```
+
+```{r}
+colnames(merged_data_full2)
+merged_data_full2 <- merged_data_full2[, !(names(merged_data_full2) %in% c("World regions according to OWID"))]
+colnames(merged_data_full2)
+
+```
+
+```{r}
+TradeData <- merged_data_full2
+colnames(TradeData)
+summary(TradeData)
+```
+
+```{r}
+summary(TradeData$AnnualTradeValue)
+TradeData_clean <- na.omit(TradeData)
+
+```
+
+### Cleaning and preparing the data 
+
+```{r}
+# Remove rows with NA values in specified columns
+TradeData <- TradeData %>%
+  filter(!is.na(`GDP per capita`) & 
+         !is.na(`Value of global merchandise exports as a share of GDP`) & 
+         !is.na(GrowthPercentage))
+
+```
+
+```{r}
+summary(TradeData)
+```
+
+```{r}
+
+library(car) 
+
+# Compute VIF
+vif(lm(GrowthPercentage ~ `GDP per capita` + `Value of global merchandise exports as a share of GDP`, data = TradeData))
+
+# Check correlations between predictors
+cor(TradeData[, c("GDP per capita", "Value of global merchandise exports as a share of GDP", "AnnualTradeValue")])
+
+```
+
+1.  **GDP per capita and Annual Trade Value**: The correlation is **0.38**, indicating a moderate positive relationship. This suggests that as GDP per capita increases, the annual trade value tends to increase as well, though not strongly.
+
+2.  **Value of Global Merchandise Exports as a Share of GDP and Annual Trade Value**: The correlation is quite **low** at **0.04**, indicating almost no linear relationship between these two variables. This implies that the share of merchandise exports as a portion of GDP is not strongly related to the total annual trade value.
+
+3.  **GDP per capita and Value of Global Merchandise Exports as a Share of GDP**: The correlation here is **0.31**, suggesting a weak to moderate positive relationship. This could indicate that richer countries (higher GDP per capita) tend to have a somewhat higher share of exports relative to GDP, but the relationship is not particularly strong.
+
+```{r}
+# Run model with all predictors
+lm_full <- lm(GrowthPercentage ~ `GDP per capita` + `Value of global merchandise exports as a share of GDP` + AnnualTradeValue, data = TradeData)
+
+# Compute VIF
+vif(lm_full)
+
+# Fit a reduced model (with three variables for VIF)
+lm_reduced <- lm(GrowthPercentage ~ `GDP per capita` + `Value of global merchandise exports as a share of GDP` + AnnualTradeValue, data = TradeData)
+
+# Compute VIF
+vif(lm_reduced)
+
+```
+
+```{r}
+
+
+library(mice)
+imputed_data <- mice(TradeData, m = 1, method = 'pmm', maxit = 10, seed = 123)
+TradeData_imputed <- complete(imputed_data)
+
+# Perform PCA including the new variable
+pca <- prcomp(TradeData_imputed[, c("GDP per capita", "Value of global merchandise exports as a share of GDP", "AnnualTradeValue")], scale. = TRUE)
+
+# Get the first principal component
+TradeData_imputed$PCA1 <- pca$x[, 1]
+
+# Use the first principal component in the regression model
+model_pca <- lm(GrowthPercentage ~ PCA1, data = TradeData_imputed)
+summary(model_pca)
+
+# Run the regression again with the new variable included
+model <- lm(GrowthPercentage ~ `GDP per capita` + `Value of global merchandise exports as a share of GDP` + AnnualTradeValue, data = TradeData_imputed)
+summary(model)
+```
+
+```{r}
+library(glmnet)
+
+# Prepare data with the new column
+x <- as.matrix(TradeData[, c("GDP per capita", "Value of global merchandise exports as a share of GDP", "AnnualTradeValue")])
+y <- TradeData$GrowthPercentage
+
+# Ridge regression (alpha = 0)
+ridge_model <- glmnet(x, y, alpha = 0)
+
+# Lasso regression (alpha = 1)
+lasso_model <- glmnet(x, y, alpha = 1)
+
+# Cross-validation to choose lambda
+cv_ridge <- cv.glmnet(x, y, alpha = 0)
+cv_lasso <- cv.glmnet(x, y, alpha = 1)
+
+# Best lambda values
+cv_ridge$lambda.min
+cv_lasso$lambda.min
+
+TradeData_scaled <- TradeData
+TradeData_scaled[, c("GDP per capita", "Value of global merchandise exports as a share of GDP", "AnnualTradeValue")] <- scale(TradeData[, c("GDP per capita", "Value of global merchandise exports as a share of GDP", "AnnualTradeValue")])
+
+
+```
+
+```{r}
+coef(ridge_model, s = cv_ridge$lambda.min)
+coef(lasso_model, s = cv_lasso$lambda.min)
+
+```
+
+### **Lambda values for Ridge and Lasso**:
+
+-   Ridge (**`lambda.min`**): 11.77226
+
+-   Lasso (**`lambda.min`**): 0.00890528 These values represent the best regularization parameters selected through cross-validation.
+
+1.  **Ridge regression coefficients** at the optimal lambda (**`lambda.min`**):
+
+    -   Intercept: 12.31165
+
+    -   **`GDP per capita`**: -7.984363e-05
+
+    -   **`Value of global merchandise exports as a share of GDP`**: 0.05867669
+
+    -   **`AnnualTradeValue`**: -2.039838e-09
+
+2.  **Lasso regression coefficients** at the optimal lambda (**`lambda.min`**):
+
+    -   Intercept: 12.13900
+
+    -   **`GDP per capita`**: -1.051822e-04
+
+    -   **`Value of global merchandise exports as a share of GDP`**: 0.07758722
+
+    -   **`AnnualTradeValue`**: -2.109717e-09
+
+### **Interpretation:**
+
+-   Both models suggest a negative relationship between **`GDP per capita`** and the dependent variable (**`GrowthPercentage`**), and a positive relationship for the share of global merchandise exports and growth percentage.
+
+-   The coefficients for **`AnnualTradeValue`** in both models are very close to zero, suggesting that **`AnnualTradeValue`** has a minimal impact on the predicted **`GrowthPercentage`** after regularization
+
+At this point, I want to check if adding the Annual Trade Value helped my model:
+
+```{r}
+# Run a full linear model with all predictors including the new column
+model_full <- lm(GrowthPercentage ~ `GDP per capita` + `Value of global merchandise exports as a share of GDP` + AnnualTradeValue, data = TradeData)
+
+# Summary of the model to check adjusted R-squared and other diagnostics
+summary(model_full)
+
+# Plot residuals to assess if the new predictor improves the model
+ggplot(TradeData, aes(x = fitted(model_full), y = residuals(model_full))) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, color = "red") +
+  labs(
+    title = "Residual Plot",
+    x = "Fitted Values",
+    y = "Residuals"
+  )
+
+# Compare models by adjusted R-squared
+model_no_new <- lm(GrowthPercentage ~ `GDP per capita` + `Value of global merchandise exports as a share of GDP`, data = TradeData)
+summary(model_no_new)$adj.r.squared
+summary(model_full)$adj.r.squared
+
+# Check for improvements in the model
+if (summary(model_full)$adj.r.squared > summary(model_no_new)$adj.r.squared) {
+  print("The new predictor improved the model.")
+} else {
+  print("The new predictor did not improve the model.")
+}
+
+```
+
+The new predictor did not necessarily improve the model.
+
+***We can now do some predictive model analysis***
+
+```{r}
+# Run a linear model with all predictors including the new column
+linear_model_full <- lm(GrowthPercentage ~ `GDP per capita` + `Value of global merchandise exports as a share of GDP` + AnnualTradeValue, data = TradeData)
+
+# Add predictions to dataset
+TradeData <- TradeData %>%
+  mutate(PredictedGrowth = predict(linear_model_full, newdata = TradeData))
+
+# Residual Analysis
+ggplot(TradeData, aes(x = PredictedGrowth, y = GrowthPercentage - PredictedGrowth)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, color = "red") +
+  labs(
+    title = "Residual Analysis with New Predictor",
+    x = "Predicted Growth Percentage",
+    y = "Residuals"
+  )
+
+```
+
+```{r}
+model_1 <- model_no_new
+model_2 <- model_full
+
+# Model Summaries
+summary(model_1)
+summary(model_2)
+
+TradeData_country_summary <- TradeData %>%
+  group_by(CountryName) %>%
+  summarise(mean_gdp_per_capita = mean(`GDP per capita`, na.rm = TRUE),
+            mean_exports_share_of_GDP = mean(`Value of global merchandise exports as a share of GDP`, na.rm = TRUE))
+
+# EDA Visualizations
+# Scatterplot: GDP per Capita vs. Exports
+# Exporting model summaries
+broom::tidy(model_1) %>% write.csv("Model_1_Summary.csv")
+broom::tidy(model_2) %>% write.csv("Model_2_Summary.csv")
+
+
+# Visualize GDP per capita vs exports share for different countries
+ggplot(TradeData_country_summary, aes(x = mean_gdp_per_capita, y = mean_exports_share_of_GDP)) +
+  geom_point() +
+  labs(title = "Country-Level GDP vs Export Share of GDP", 
+       x = "GDP per Capita", 
+       y = "Exports as Share of GDP") +
+  theme_minimal()
+
+# Further statistical analysis: e.g., correlation between GDP per capita and export share
+cor(TradeData_clean$`GDP per capita`, 
+    TradeData_clean$`Value of global merchandise exports as a share of GDP`, 
+    use = "complete.obs")
+
+# For time series analysis, group by Year and summarize export share
+TradeData_year_summary <- TradeData_clean %>%
+  group_by(Year) %>%
+  summarise(mean_exports_share_of_GDP = mean(`Value of global merchandise exports as a share of GDP`, na.rm = TRUE))
+
+# Plot export share over the years
+ggplot(TradeData_year_summary, aes(x = Year, y = mean_exports_share_of_GDP)) +
+  geom_line(color = "red") +
+  labs(title = "Global Merchandise Exports as Share of GDP Over Time", 
+       x = "Year", 
+       y = "Mean Share of GDP") +
+  theme_minimal()
+
+# Saving cleaned data for further analysis or export
+write_csv(TradeData_clean, "cleaned_data.csv")
+
+```
+
+Both models suggest that the predictors (**`GDP per capita`**, **`Value of global merchandise exports as a share of GDP`**, and **`AnnualTradeValue`**) explain very little of the variation in growth percentage, as indicated by the low R-squared values. Only the **`GDP per capita`** variable in the first model is statistically significant at the 5% level, with a negative relationship to growth percentage. The export share of GDP has a marginal significance (near the 10% level) but does not show a strong effect.
+
+Thus, the models indicate weak explanatory power and suggest that other factors not included in the model may have a stronger influence on growth percentage.
+
+### Advanced Analysis
+
+```{r}
+
+# Interaction terms in regression
+model_3 <- lm(`Value of global merchandise exports as a share of GDP` ~ 
+              `GDP per capita` * GrowthPercentage, data = TradeData)
+summary(model_3)
+
+# Exporting interaction model summary
+broom::tidy(model_3) %>% write.csv("Model_3_Summary.csv")
+
+# Feature Engineering
+TradeData <- TradeData %>%
+  mutate(
+    Population_in_millions = TradeData$"Population (historical)" / 1e6,
+    GDP_to_population_ratio = `GDP per capita` / TradeData$"Population (historical)"
+  )
+```
+
+```{r}
+
+
+# View the summarized country-level data
+head(TradeData_country_summary)
+
+# Visualize GDP per capita vs exports share for different countries
+ggplot(TradeData_country_summary, aes(x = mean_gdp_per_capita, y = mean_exports_share_of_GDP)) +
+  geom_point() +
+  labs(title = "Country-Level GDP vs Export Share of GDP", 
+       x = "GDP per Capita", 
+       y = "Exports as Share of GDP") +
+  theme_minimal()
+
+# Further statistical analysis: e.g., correlation between GDP per capita and export share
+cor(TradeData_clean$`GDP per capita`, 
+    TradeData_clean$`Value of global merchandise exports as a share of GDP`, 
+    use = "complete.obs")
+
+# For time series analysis, group by Year and summarize export share
+TradeData_year_summary <- TradeData_clean %>%
+  group_by(Year) %>%
+  summarise(mean_exports_share_of_GDP = mean(`Value of global merchandise exports as a share of GDP`, na.rm = TRUE))
+
+# Plot export share over the years
+ggplot(TradeData_year_summary, aes(x = Year, y = mean_exports_share_of_GDP)) +
+  geom_line(color = "red") +
+  labs(title = "Global Merchandise Exports as Share of GDP Over Time", 
+       x = "Year", 
+       y = "Mean Share of GDP") +
+  theme_minimal()
+
+
+# Saving cleaned data for further analysis or export
+write_csv(TradeData_clean, "cleaned_data.csv")
+
+```
